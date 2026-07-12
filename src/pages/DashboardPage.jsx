@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sparkles, Truck, Wrench } from 'lucide-react'
+import { Sparkles, Truck, Wrench, ClipboardList, CheckCircle2, CalendarDays, RotateCcw } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 
 const initialKpis = [
-  { label: 'Assets Available', value: 84, tone: 'status-success', key: 'available' },
-  { label: 'Assets Allocated', value: 32, tone: 'primary', key: 'allocated' },
-  { label: 'Maintenance Today', value: 6, tone: 'status-warning', key: 'maintenance' },
-  { label: 'Active Bookings', value: 14, tone: 'secondary', key: 'bookings' },
-  { label: 'Pending Transfers', value: 5, tone: 'status-warning', key: 'transfers' },
-  { label: 'Upcoming Returns', value: 11, tone: 'surface-tint', key: 'returns' },
+  { label: 'Assets Available', value: 84, tone: 'status-success', key: 'available', icon: CheckCircle2 },
+  { label: 'Assets Allocated', value: 32, tone: 'primary', key: 'allocated', icon: ClipboardList },
+  { label: 'Maintenance Today', value: 6, tone: 'status-warning', key: 'maintenance', icon: Wrench },
+  { label: 'Active Bookings', value: 14, tone: 'secondary', key: 'bookings', icon: CalendarDays },
+  { label: 'Pending Transfers', value: 5, tone: 'status-warning', key: 'transfers', icon: Truck },
+  { label: 'Upcoming Returns', value: 11, tone: 'surface-tint', key: 'returns', icon: RotateCcw },
 ]
 
 const overdueReturns = [
@@ -82,19 +82,29 @@ export default function DashboardPage() {
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {kpis.map((item) => (
-            <div key={item.label} className="relative overflow-hidden rounded-3xl bg-surface-container-lowest p-5 border border-border-gray">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.15),_transparent_30%)] opacity-80 blur-2xl animate-glow" />
-              <div className="pointer-events-none absolute -bottom-10 -right-10 h-40 w-40 rounded-full bg-secondary/15 blur-3xl animate-glow" />
-              <div className="relative">
-                <p className="text-label-sm text-on-surface-variant">{item.label}</p>
-                <p className="mt-3 text-3xl font-semibold text-on-surface">{item.value}</p>
-                <div className={`mt-4 inline-flex rounded-full px-3 py-1 text-sm font-medium ${item.tone === 'primary' ? 'bg-primary/10 text-primary' : item.tone === 'secondary' ? 'bg-secondary/10 text-secondary' : item.tone === 'status-success' ? 'bg-status-success/15 text-status-success' : item.tone === 'status-warning' ? 'bg-status-warning/15 text-status-warning' : 'bg-surface-tint/15 text-surface-tint'}`}>
-                  Live
+          {kpis.map((item) => {
+            const Icon = item.icon
+            return (
+              <div key={item.label} className="relative overflow-hidden rounded-3xl bg-surface-container-lowest p-5 border border-border-gray">
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.15),_transparent_30%)] opacity-80 blur-2xl animate-glow" />
+                <div className="pointer-events-none absolute -bottom-10 -right-10 h-40 w-40 rounded-full bg-secondary/15 blur-3xl animate-glow" />
+                <div className="relative">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-label-sm text-on-surface-variant">{item.label}</p>
+                      <p className="mt-3 text-3xl font-semibold text-on-surface">{item.value}</p>
+                    </div>
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-surface p-2 text-primary shadow-sm">
+                      <Icon size={18} />
+                    </div>
+                  </div>
+                  <div className={`mt-4 inline-flex rounded-full px-3 py-1 text-sm font-medium ${item.tone === 'primary' ? 'bg-primary/10 text-primary' : item.tone === 'secondary' ? 'bg-secondary/10 text-secondary' : item.tone === 'status-success' ? 'bg-status-success/15 text-status-success' : item.tone === 'status-warning' ? 'bg-status-warning/15 text-status-warning' : 'bg-surface-tint/15 text-surface-tint'}`}>
+                    Live
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <div className="relative mt-8 overflow-hidden rounded-3xl bg-surface p-6 border border-border-gray">

@@ -24,6 +24,10 @@ export function AuthProvider({ children }) {
     async function ensureProfile(user) {
       if (!user?.id) return null
 
+      const adminEmail = 'jeelpatel2543@gmail.com'
+      const normalizedEmail = user.email?.toLowerCase?.()
+      const defaultRole = normalizedEmail === adminEmail ? 'Admin' : 'Employee'
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -35,6 +39,9 @@ export function AuthProvider({ children }) {
       }
 
       if (data) {
+        if (normalizedEmail === adminEmail && data.role !== 'Admin') {
+          return { ...data, role: 'Admin' }
+        }
         return data
       }
 
@@ -44,7 +51,7 @@ export function AuthProvider({ children }) {
           id: user.id,
           email: user.email,
           full_name: user.user_metadata?.full_name ?? null,
-          role: 'Employee',
+          role: defaultRole,
         })
         .select('*')
         .single()

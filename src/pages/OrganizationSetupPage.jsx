@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, ShieldCheck, Layers, Users } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../components/AuthProvider'
 
 const departments = [
   { name: 'Facilities', head: 'Alex Kim', parent: 'Corporate', status: 'Active' },
@@ -30,7 +31,10 @@ export default function OrganizationSetupPage() {
   const [activeTab, setActiveTab] = useState('departments')
   const [departmentsData, setDepartmentsData] = useState(departments)
   const [categoriesData, setCategoriesData] = useState(categories)
+  const { profile } = useAuth()
+  const isAdmin = profile?.email?.toLowerCase?.() === 'jeelpatel2543@gmail.com' || profile?.role === 'Admin'
   const [employeesData, setEmployeesData] = useState(employees)
+  const [usersData, setUsersData] = useState(employees)
   const [showDepartmentForm, setShowDepartmentForm] = useState(false)
   const [showCategoryForm, setShowCategoryForm] = useState(false)
   const [showEmployeeForm, setShowEmployeeForm] = useState(false)
@@ -45,10 +49,11 @@ export default function OrganizationSetupPage() {
     let mounted = true
 
     async function loadOrganizationData() {
-      const [departmentsResult, categoriesResult, employeesResult] = await Promise.all([
+      const [departmentsResult, categoriesResult, employeesResult, profilesResult] = await Promise.all([
         supabase.from('departments').select('*').order('name', { ascending: true }),
         supabase.from('asset_categories').select('*').order('name', { ascending: true }),
         supabase.from('employees').select('*').order('name', { ascending: true }),
+        supabase.from('profiles').select('*').order('email', { ascending: true }),
       ])
 
       if (!mounted) return
@@ -76,6 +81,28 @@ export default function OrganizationSetupPage() {
 
       if (!employeesResult.error && employeesResult.data?.length) {
         setEmployeesData(
+          employeesResult.data.map((item) => ({
+            name: item.name ?? item.full_name ?? 'Employee',
+            email: item.email ?? item.user_email ?? 'unknown@example.com',
+            department: item.department ?? item.team ?? 'General',
+            role: item.role ?? item.position ?? 'Employee',
+            status: item.status ?? item.state ?? 'Active',
+          })),
+        )
+      }
+
+      if (!profilesResult.error && profilesResult.data?.length) {
+        setUsersData(
+          profilesResult.data.map((item) => ({
+            name: item.full_name ?? item.name ?? 'User',
+            email: item.email ?? 'unknown@example.com',
+            department: item.department ?? item.team ?? 'General',
+            role: item.role ?? 'Employee',
+            status: item.status ?? 'Active',
+          })),
+        )
+      } else if (!employeesResult.error && employeesResult.data?.length) {
+        setUsersData(
           employeesResult.data.map((item) => ({
             name: item.name ?? item.full_name ?? 'Employee',
             email: item.email ?? item.user_email ?? 'unknown@example.com',
@@ -196,18 +223,18 @@ export default function OrganizationSetupPage() {
         setFormError('Unable to save employee right now. Please try again.')
         return
       }
-      setEmployeesData((current) => [
-        {
-          name: data.name,
-          email: data.email,
-          department: data.department,
-          role: data.role,
-          status: data.status,
-        },
-        ...current,
-      ])
+      const nextUser = {
+        name: data.name,
+        email: data.email,
+        department: data.department,
+        role: data.role,
+        status: data.status,
+      }
+      setEmployeesData((current) => [nextUser, ...current])
+      setUsersData((current) => [nextUser, ...current])
     } else {
       setEmployeesData((current) => [payload, ...current])
+      setUsersData((current) => [payload, ...current])
     }
 
     setNewEmployee({ name: '', email: '', department: '', role: 'Employee', status: 'Active' })
@@ -222,7 +249,10 @@ export default function OrganizationSetupPage() {
       'Department Head': 'Director',
       Director: 'Senior Director',
     }
-    const nextRole = promotionMap[employee.role] ?? `Senior ${employee.role}`
+    const normalizedRole = employee.role?.trim() ?? ''
+    const nextRole =
+      promotionMap[normalizedRole] ??
+      (normalizedRole.startsWith('Senior ') ? normalizedRole : `Senior ${normalizedRole}`)
 
     if (supabase && employee.email) {
       const { data, error } = await supabase
@@ -236,11 +266,17 @@ export default function OrganizationSetupPage() {
         setEmployeesData((current) =>
           current.map((item) => (item.email === employee.email ? { ...item, role: data.role ?? nextRole } : item)),
         )
+        setUsersData((current) =>
+          current.map((item) => (item.email === employee.email ? { ...item, role: data.role ?? nextRole } : item)),
+        )
         return
       }
     }
 
     setEmployeesData((current) =>
+      current.map((item) => (item.email === employee.email ? { ...item, role: nextRole } : item)),
+    )
+    setUsersData((current) =>
       current.map((item) => (item.email === employee.email ? { ...item, role: nextRole } : item)),
     )
   }
@@ -546,7 +582,7 @@ export default function OrganizationSetupPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-gray">
-                {employeesData.map((item) => (
+                {usersData.map((item) => (
                   <tr key={item.email} className="hover:bg-surface transition">
                     <td className="py-4">{item.name}</td>
                     <td className="py-4">{item.email}</td>
@@ -558,13 +594,17 @@ export default function OrganizationSetupPage() {
                       </span>
                     </td>
                     <td className="py-4">
-                      <button
-                        type="button"
-                        onClick={() => promoteEmployee(item)}
-                        className="rounded-xl bg-surface px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5 transition"
-                      >
-                        Promote
-                      </button>
+                      {isAdmin ? (
+                        <button
+                          type="button"
+                          onClick={() => promoteEmployee(item)}
+                          className="rounded-xl bg-surface px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5 transition"
+                        >
+                          Promote
+                        </button>
+                      ) : (
+                        <span className="text-sm text-on-surface-variant">Admin only</span>
+                      )}
                     </td>
                   </tr>
                 ))}

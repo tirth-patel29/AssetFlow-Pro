@@ -37,7 +37,14 @@ function App() {
           <Route path="audits" element={<AuditsPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
-          <Route path="organization-setup" element={<OrganizationSetupPage />} />
+          <Route
+            path="organization-setup"
+            element={
+              <ProtectedRoute requiredRole="Admin">
+                <OrganizationSetupPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
