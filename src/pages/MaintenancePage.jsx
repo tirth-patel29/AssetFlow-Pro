@@ -23,16 +23,26 @@ export default function MaintenancePage() {
 
     let mounted = true
 
-    async function loadRequests() {
-      const { data, error } = await supabase
-        .from('maintenance_requests')
-        .select('*')
-        .order('created_at', { ascending: false })
+    async function loadData() {
+      const [requestsResult, assetsResult] = await Promise.all([
+        supabase
+          .from('maintenance_requests')
+          .select('*')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('assets')
+          .select('name, asset_name, resource')
+          .order('created_at', { ascending: false }),
+      ])
 
       if (!mounted) return
 
       if (!assetsResult.error && assetsResult.data?.length) {
-        setAssetOptions(assetsResult.data.map((item) => item.name ?? ''))
+        setAssetOptions(
+          assetsResult.data
+            .map((item) => item.name ?? item.asset_name ?? item.resource ?? item.tag ?? 'Unknown asset')
+            .filter(Boolean),
+        )
       }
 
       if (!requestsResult.error && requestsResult.data?.length) {
@@ -55,7 +65,7 @@ export default function MaintenancePage() {
       }
     }
 
-    loadRequests()
+    loadData()
 
     return () => {
       mounted = false
