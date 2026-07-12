@@ -31,7 +31,7 @@ export default function MaintenancePage() {
           .order('created_at', { ascending: false }),
         supabase
           .from('assets')
-          .select('name, asset_name, resource')
+          .select('*')
           .order('created_at', { ascending: false }),
       ])
 
@@ -40,7 +40,7 @@ export default function MaintenancePage() {
       if (!assetsResult.error && assetsResult.data?.length) {
         setAssetOptions(
           assetsResult.data
-            .map((item) => item.name ?? item.asset_name ?? item.resource ?? item.tag ?? 'Unknown asset')
+            .map((item) => item.name ?? item.asset_name ?? item.resource ?? item.tag ?? item.asset_tag ?? 'Unknown asset')
             .filter(Boolean),
         )
       }
