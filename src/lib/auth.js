@@ -1,21 +1,32 @@
 import { supabase } from './supabaseClient'
 
+function ensureClient() {
+  if (!supabase) {
+    return { error: { message: 'Supabase client is not configured.' } }
+  }
+  return { client: supabase }
+}
+
 export async function signUp(email, password) {
-  const { data, error } = await supabase.auth.signUp({ email, password })
-  return { data, error }
+  const { client, error } = ensureClient()
+  if (error) return { data: null, error }
+  return await client.auth.signUp({ email, password })
 }
 
 export async function signIn(email, password) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-  return { data, error }
+  const { client, error } = ensureClient()
+  if (error) return { data: null, error }
+  return await client.auth.signInWithPassword({ email, password })
 }
 
 export async function signOut() {
-  const { error } = await supabase.auth.signOut()
-  return { error }
+  const { client, error } = ensureClient()
+  if (error) return { error }
+  return await client.auth.signOut()
 }
 
 export async function getCurrentUser() {
-  const { data, error } = await supabase.auth.getUser()
-  return { data, error }
+  const { client, error } = ensureClient()
+  if (error) return { data: null, error }
+  return await client.auth.getUser()
 }
