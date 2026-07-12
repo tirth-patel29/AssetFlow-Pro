@@ -17,8 +17,16 @@ export default function SignupPage() {
     setMessage('')
 
     const { data, error } = await signUp(email, password)
-    if (error) {
-      setError(error.message)
+    const lowerMessage = error?.message?.toLowerCase() ?? ''
+    const isEmailRateLimit = lowerMessage.includes('rate limit') || lowerMessage.includes('too many requests') || lowerMessage.includes('429')
+    const isTempUnavailable = lowerMessage.includes('temp') || lowerMessage.includes('not available') || lowerMessage.includes('temporarily unavailable')
+
+    if (error && !data?.user) {
+      if (isEmailRateLimit || isTempUnavailable) {
+        setError('Signup is temporarily unavailable, please try again in a few minutes.')
+      } else {
+        setError(error.message || 'Unable to complete signup. Please try again.')
+      }
       return
     }
 
@@ -28,7 +36,11 @@ export default function SignupPage() {
     }
 
     if (data?.user) {
-      setMessage('Signup successful. Please log in to continue.')
+      if (error && (isEmailRateLimit || isTempUnavailable)) {
+        setMessage('Account created. Verification email delivery may be delayed, please check your inbox soon.')
+      } else {
+        setMessage('Signup successful. Please log in to continue.')
+      }
       return
     }
 
