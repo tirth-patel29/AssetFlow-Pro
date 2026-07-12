@@ -33,3 +33,18 @@ select {
 ::selection {
   background: rgba(79, 70, 229, 0.2);
 }
+
+@keyframes floatGlow {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translate(5px, -8px) scale(1.03);
+    opacity: 1;
+  }
+}
+
+.animate-glow {
+  animation: floatGlow 8s ease-in-out infinite;
+}

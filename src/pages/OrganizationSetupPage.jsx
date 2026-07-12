@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Plus, ShieldCheck, Layers, Users } from 'lucide-react'
+import { supabase } from '../lib/supabaseClient'
 
 const departments = [
   { name: 'Facilities', head: 'Alex Kim', parent: 'Corporate', status: 'Active' },
@@ -27,21 +28,296 @@ const tabs = [
 
 export default function OrganizationSetupPage() {
   const [activeTab, setActiveTab] = useState('departments')
+  const [departmentsData, setDepartmentsData] = useState(departments)
+  const [categoriesData, setCategoriesData] = useState(categories)
+  const [employeesData, setEmployeesData] = useState(employees)
+  const [showDepartmentForm, setShowDepartmentForm] = useState(false)
+  const [showCategoryForm, setShowCategoryForm] = useState(false)
+  const [showEmployeeForm, setShowEmployeeForm] = useState(false)
+  const [newDepartment, setNewDepartment] = useState({ name: '', head: '', parent: '', status: 'Active' })
+  const [newCategory, setNewCategory] = useState({ name: '', fields: '', status: 'Active' })
+  const [newEmployee, setNewEmployee] = useState({ name: '', email: '', department: '', role: 'Employee', status: 'Active' })
+  const [formError, setFormError] = useState('')
+
+  useEffect(() => {
+    if (!supabase) return
+
+    let mounted = true
+
+    async function loadOrganizationData() {
+      const [departmentsResult, categoriesResult, employeesResult] = await Promise.all([
+        supabase.from('departments').select('*').order('name', { ascending: true }),
+        supabase.from('asset_categories').select('*').order('name', { ascending: true }),
+        supabase.from('employees').select('*').order('name', { ascending: true }),
+      ])
+
+      if (!mounted) return
+
+      if (!departmentsResult.error && departmentsResult.data?.length) {
+        setDepartmentsData(
+          departmentsResult.data.map((item) => ({
+            name: item.name ?? item.department_name ?? 'Department',
+            head: item.head ?? item.manager ?? 'Unassigned',
+            parent: item.parent ?? item.parent_department ?? 'Corporate',
+            status: item.status ?? item.state ?? 'Active',
+          })),
+        )
+      }
+
+      if (!categoriesResult.error && categoriesResult.data?.length) {
+        setCategoriesData(
+          categoriesResult.data.map((item) => ({
+            name: item.name ?? item.category_name ?? 'Category',
+            fields: item.fields ?? item.field_template ?? '-',
+            status: item.status ?? item.state ?? 'Active',
+          })),
+        )
+      }
+
+      if (!employeesResult.error && employeesResult.data?.length) {
+        setEmployeesData(
+          employeesResult.data.map((item) => ({
+            name: item.name ?? item.full_name ?? 'Employee',
+            email: item.email ?? item.user_email ?? 'unknown@example.com',
+            department: item.department ?? item.team ?? 'General',
+            role: item.role ?? item.position ?? 'Employee',
+            status: item.status ?? item.state ?? 'Active',
+          })),
+        )
+      }
+    }
+
+    loadOrganizationData()
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  async function handleCreateDepartment(event) {
+    event.preventDefault()
+    setFormError('')
+
+    if (!newDepartment.name.trim()) {
+      setFormError('Department name is required.')
+      return
+    }
+
+    const payload = {
+      name: newDepartment.name,
+      head: newDepartment.head,
+      parent: newDepartment.parent,
+      status: newDepartment.status,
+    }
+
+    if (supabase) {
+      const { data, error } = await supabase.from('departments').insert(payload).select('*').single()
+      if (error) {
+        console.error('Unable to save department:', error.message)
+        setFormError('Unable to save department right now. Please try again.')
+        return
+      }
+      setDepartmentsData((current) => [
+        {
+          name: data.name,
+          head: data.head,
+          parent: data.parent,
+          status: data.status,
+        },
+        ...current,
+      ])
+    } else {
+      setDepartmentsData((current) => [payload, ...current])
+    }
+
+    setNewDepartment({ name: '', head: '', parent: '', status: 'Active' })
+    setShowDepartmentForm(false)
+  }
+
+  async function handleCreateCategory(event) {
+    event.preventDefault()
+    setFormError('')
+
+    if (!newCategory.name.trim()) {
+      setFormError('Category name is required.')
+      return
+    }
+
+    const payload = {
+      name: newCategory.name,
+      fields: newCategory.fields,
+      status: newCategory.status,
+    }
+
+    if (supabase) {
+      const { data, error } = await supabase.from('asset_categories').insert(payload).select('*').single()
+      if (error) {
+        console.error('Unable to save category:', error.message)
+        setFormError('Unable to save category right now. Please try again.')
+        return
+      }
+      setCategoriesData((current) => [
+        {
+          name: data.name,
+          fields: data.fields,
+          status: data.status,
+        },
+        ...current,
+      ])
+    } else {
+      setCategoriesData((current) => [payload, ...current])
+    }
+
+    setNewCategory({ name: '', fields: '', status: 'Active' })
+    setShowCategoryForm(false)
+  }
+
+  async function handleCreateEmployee(event) {
+    event.preventDefault()
+    setFormError('')
+
+    if (!newEmployee.name.trim() || !newEmployee.email.trim()) {
+      setFormError('Name and email are required.')
+      return
+    }
+
+    const payload = {
+      name: newEmployee.name,
+      email: newEmployee.email,
+      department: newEmployee.department,
+      role: newEmployee.role,
+      status: newEmployee.status,
+    }
+
+    if (supabase) {
+      const { data, error } = await supabase.from('employees').insert(payload).select('*').single()
+      if (error) {
+        console.error('Unable to save employee:', error.message)
+        setFormError('Unable to save employee right now. Please try again.')
+        return
+      }
+      setEmployeesData((current) => [
+        {
+          name: data.name,
+          email: data.email,
+          department: data.department,
+          role: data.role,
+          status: data.status,
+        },
+        ...current,
+      ])
+    } else {
+      setEmployeesData((current) => [payload, ...current])
+    }
+
+    setNewEmployee({ name: '', email: '', department: '', role: 'Employee', status: 'Active' })
+    setShowEmployeeForm(false)
+  }
+
+  async function promoteEmployee(employee) {
+    const promotionMap = {
+      Employee: 'Senior Employee',
+      'Senior Employee': 'Lead Employee',
+      'Asset Manager': 'Senior Asset Manager',
+      'Department Head': 'Director',
+      Director: 'Senior Director',
+    }
+    const nextRole = promotionMap[employee.role] ?? `Senior ${employee.role}`
+
+    if (supabase && employee.email) {
+      const { data, error } = await supabase
+        .from('employees')
+        .update({ role: nextRole })
+        .eq('email', employee.email)
+        .select('*')
+        .single()
+
+      if (!error && data) {
+        setEmployeesData((current) =>
+          current.map((item) => (item.email === employee.email ? { ...item, role: data.role ?? nextRole } : item)),
+        )
+        return
+      }
+    }
+
+    setEmployeesData((current) =>
+      current.map((item) => (item.email === employee.email ? { ...item, role: nextRole } : item)),
+    )
+  }
 
   const content = useMemo(() => {
     if (activeTab === 'departments') {
       return (
         <div className="space-y-6">
           <div className="rounded-3xl bg-surface-container-lowest p-6 border border-border-gray">
-            <div className="flex items-center justify-between gap-4 mb-4">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4">
               <div>
                 <p className="text-label-sm uppercase tracking-[0.22em] text-on-surface-variant">Department management</p>
                 <h2 className="text-xl font-semibold text-on-surface">Create and manage departments</h2>
               </div>
-              <button className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-white font-semibold hover:bg-primary/90 transition">
-                <Plus size={16} /> New department
+              <button
+                type="button"
+                onClick={() => setShowDepartmentForm((value) => !value)}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-white font-semibold hover:bg-primary/90 transition"
+              >
+                <Plus size={16} /> {showDepartmentForm ? 'Hide form' : 'New department'}
               </button>
             </div>
+
+            {showDepartmentForm && (
+              <form className="space-y-4 rounded-3xl bg-white p-6 border border-border-gray mb-6" onSubmit={handleCreateDepartment}>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div>
+                    <label className="block text-label-md text-on-surface mb-2">Department name</label>
+                    <input
+                      value={newDepartment.name}
+                      onChange={(e) => setNewDepartment((current) => ({ ...current, name: e.target.value }))}
+                      required
+                      className="w-full rounded-xl border border-border-gray bg-surface px-4 py-3 text-body-md text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-label-md text-on-surface mb-2">Head</label>
+                    <input
+                      value={newDepartment.head}
+                      onChange={(e) => setNewDepartment((current) => ({ ...current, head: e.target.value }))}
+                      className="w-full rounded-xl border border-border-gray bg-surface px-4 py-3 text-body-md text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div>
+                    <label className="block text-label-md text-on-surface mb-2">Parent department</label>
+                    <input
+                      value={newDepartment.parent}
+                      onChange={(e) => setNewDepartment((current) => ({ ...current, parent: e.target.value }))}
+                      className="w-full rounded-xl border border-border-gray bg-surface px-4 py-3 text-body-md text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-label-md text-on-surface mb-2">Status</label>
+                    <select
+                      value={newDepartment.status}
+                      onChange={(e) => setNewDepartment((current) => ({ ...current, status: e.target.value }))}
+                      className="w-full rounded-xl border border-border-gray bg-surface px-4 py-3 text-body-md text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    >
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button type="button" onClick={() => setShowDepartmentForm(false)} className="rounded-xl border border-border-gray px-5 py-3 text-body-md text-on-surface hover:bg-surface transition">
+                    Cancel
+                  </button>
+                  <button className="rounded-xl bg-secondary px-5 py-3 text-white font-semibold hover:bg-secondary/90 transition" type="submit">
+                    Create department
+                  </button>
+                </div>
+                {formError && <div className="text-sm text-status-error">{formError}</div>}
+              </form>
+            )}
+
             <div className="overflow-x-auto">
               <table className="min-w-full text-left">
                 <thead>
@@ -54,7 +330,7 @@ export default function OrganizationSetupPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-gray">
-                  {departments.map((item) => (
+                  {departmentsData.map((item) => (
                     <tr key={item.name} className="hover:bg-surface transition">
                       <td className="py-4">{item.name}</td>
                       <td className="py-4">{item.head}</td>
@@ -81,15 +357,66 @@ export default function OrganizationSetupPage() {
       return (
         <div className="space-y-6">
           <div className="rounded-3xl bg-surface-container-lowest p-6 border border-border-gray">
-            <div className="flex items-center justify-between gap-4 mb-4">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4">
               <div>
                 <p className="text-label-sm uppercase tracking-[0.22em] text-on-surface-variant">Asset category management</p>
                 <h2 className="text-xl font-semibold text-on-surface">Category configuration</h2>
               </div>
-              <button className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-white font-semibold hover:bg-primary/90 transition">
-                <Plus size={16} /> New category
+              <button
+                type="button"
+                onClick={() => setShowCategoryForm((value) => !value)}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-white font-semibold hover:bg-primary/90 transition"
+              >
+                <Plus size={16} /> {showCategoryForm ? 'Hide form' : 'New category'}
               </button>
             </div>
+
+            {showCategoryForm && (
+              <form className="space-y-4 rounded-3xl bg-white p-6 border border-border-gray mb-6" onSubmit={handleCreateCategory}>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div>
+                    <label className="block text-label-md text-on-surface mb-2">Category name</label>
+                    <input
+                      value={newCategory.name}
+                      onChange={(e) => setNewCategory((current) => ({ ...current, name: e.target.value }))}
+                      required
+                      className="w-full rounded-xl border border-border-gray bg-surface px-4 py-3 text-body-md text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-label-md text-on-surface mb-2">Fields</label>
+                    <input
+                      value={newCategory.fields}
+                      onChange={(e) => setNewCategory((current) => ({ ...current, fields: e.target.value }))}
+                      className="w-full rounded-xl border border-border-gray bg-surface px-4 py-3 text-body-md text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div>
+                    <label className="block text-label-md text-on-surface mb-2">Status</label>
+                    <select
+                      value={newCategory.status}
+                      onChange={(e) => setNewCategory((current) => ({ ...current, status: e.target.value }))}
+                      className="w-full rounded-xl border border-border-gray bg-surface px-4 py-3 text-body-md text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    >
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button type="button" onClick={() => setShowCategoryForm(false)} className="rounded-xl border border-border-gray px-5 py-3 text-body-md text-on-surface hover:bg-surface transition">
+                    Cancel
+                  </button>
+                  <button className="rounded-xl bg-secondary px-5 py-3 text-white font-semibold hover:bg-secondary/90 transition" type="submit">
+                    Create category
+                  </button>
+                </div>
+                {formError && <div className="text-sm text-status-error">{formError}</div>}
+              </form>
+            )}
+
             <div className="overflow-x-auto">
               <table className="min-w-full text-left">
                 <thead>
@@ -101,7 +428,7 @@ export default function OrganizationSetupPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-gray">
-                  {categories.map((item) => (
+                  {categoriesData.map((item) => (
                     <tr key={item.name} className="hover:bg-surface transition">
                       <td className="py-4">{item.name}</td>
                       <td className="py-4">{item.fields}</td>
@@ -126,15 +453,86 @@ export default function OrganizationSetupPage() {
     return (
       <div className="space-y-6">
         <div className="rounded-3xl bg-surface-container-lowest p-6 border border-border-gray">
-          <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4">
             <div>
               <p className="text-label-sm uppercase tracking-[0.22em] text-on-surface-variant">Employee directory</p>
               <h2 className="text-xl font-semibold text-on-surface">Role assignments</h2>
             </div>
-            <button className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-white font-semibold hover:bg-primary/90 transition">
-              <Plus size={16} /> Add employee
+            <button
+              type="button"
+              onClick={() => setShowEmployeeForm((value) => !value)}
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-white font-semibold hover:bg-primary/90 transition"
+            >
+              <Plus size={16} /> {showEmployeeForm ? 'Hide form' : 'Add employee'}
             </button>
           </div>
+
+          {showEmployeeForm && (
+            <form className="space-y-4 rounded-3xl bg-white p-6 border border-border-gray mb-6" onSubmit={handleCreateEmployee}>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div>
+                  <label className="block text-label-md text-on-surface mb-2">Name</label>
+                  <input
+                    value={newEmployee.name}
+                    onChange={(e) => setNewEmployee((current) => ({ ...current, name: e.target.value }))}
+                    required
+                    className="w-full rounded-xl border border-border-gray bg-surface px-4 py-3 text-body-md text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-label-md text-on-surface mb-2">Email</label>
+                  <input
+                    type="email"
+                    value={newEmployee.email}
+                    onChange={(e) => setNewEmployee((current) => ({ ...current, email: e.target.value }))}
+                    required
+                    className="w-full rounded-xl border border-border-gray bg-surface px-4 py-3 text-body-md text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div>
+                  <label className="block text-label-md text-on-surface mb-2">Department</label>
+                  <input
+                    value={newEmployee.department}
+                    onChange={(e) => setNewEmployee((current) => ({ ...current, department: e.target.value }))}
+                    className="w-full rounded-xl border border-border-gray bg-surface px-4 py-3 text-body-md text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-label-md text-on-surface mb-2">Role</label>
+                  <input
+                    value={newEmployee.role}
+                    onChange={(e) => setNewEmployee((current) => ({ ...current, role: e.target.value }))}
+                    className="w-full rounded-xl border border-border-gray bg-surface px-4 py-3 text-body-md text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div>
+                  <label className="block text-label-md text-on-surface mb-2">Status</label>
+                  <select
+                    value={newEmployee.status}
+                    onChange={(e) => setNewEmployee((current) => ({ ...current, status: e.target.value }))}
+                    className="w-full rounded-xl border border-border-gray bg-surface px-4 py-3 text-body-md text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => setShowEmployeeForm(false)} className="rounded-xl border border-border-gray px-5 py-3 text-body-md text-on-surface hover:bg-surface transition">
+                  Cancel
+                </button>
+                <button className="rounded-xl bg-secondary px-5 py-3 text-white font-semibold hover:bg-secondary/90 transition" type="submit">
+                  Create employee
+                </button>
+              </div>
+              {formError && <div className="text-sm text-status-error">{formError}</div>}
+            </form>
+          )}
+
           <div className="overflow-x-auto">
             <table className="min-w-full text-left">
               <thead>
@@ -148,7 +546,7 @@ export default function OrganizationSetupPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-gray">
-                {employees.map((item) => (
+                {employeesData.map((item) => (
                   <tr key={item.email} className="hover:bg-surface transition">
                     <td className="py-4">{item.name}</td>
                     <td className="py-4">{item.email}</td>
@@ -160,7 +558,13 @@ export default function OrganizationSetupPage() {
                       </span>
                     </td>
                     <td className="py-4">
-                      <button className="rounded-xl bg-surface px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5 transition">Promote</button>
+                      <button
+                        type="button"
+                        onClick={() => promoteEmployee(item)}
+                        className="rounded-xl bg-surface px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5 transition"
+                      >
+                        Promote
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -170,7 +574,7 @@ export default function OrganizationSetupPage() {
         </div>
       </div>
     )
-  }, [activeTab])
+  }, [activeTab, showDepartmentForm, showCategoryForm, showEmployeeForm, newDepartment, newCategory, newEmployee, formError, departmentsData, categoriesData, employeesData])
 
   return (
     <div className="space-y-6">

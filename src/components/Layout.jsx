@@ -1,5 +1,7 @@
-import { Link, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { Bell, Home, Box, ClipboardList, ClipboardCheck, Layers, BarChart3, Users, Shield, Sparkles } from 'lucide-react'
+import { signOut } from '../lib/auth'
+import { useAuth } from './AuthProvider'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: Home },
@@ -14,10 +16,18 @@ const navItems = [
 ]
 
 export default function Layout() {
+  const navigate = useNavigate()
+  const { user, profile } = useAuth()
+
+  async function handleLogout() {
+    await signOut()
+    navigate('/login')
+  }
+
   return (
     <div className="min-h-screen bg-background text-on-background">
       <div className="flex min-h-screen">
-        <aside className="hidden lg:flex flex-col w-[260px] bg-surface-container-lowest border-r border-border-gray p-6">
+        <aside className="hidden lg:flex flex-col w-[260px] bg-surface-container-lowest border-r border-border-gray p-6 transition duration-300 hover:-translate-y-0.5">
           <div className="mb-10">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-white">
@@ -37,14 +47,20 @@ export default function Layout() {
             {navItems.map((item) => {
               const Icon = item.icon
               return (
-                <Link
+                <NavLink
                   key={item.to}
                   to={item.to}
-                  className="flex items-center gap-3 rounded-xl px-3 py-2 text-on-surface hover:bg-surface hover:text-primary transition"
+                  className={({ isActive }) =>
+                    `group flex items-center gap-3 rounded-2xl px-4 py-3 transition duration-200 ${
+                      isActive
+                        ? 'bg-primary text-white shadow-[0_20px_50px_rgba(59,130,246,0.12)]'
+                        : 'text-on-surface hover:bg-primary/10 hover:text-primary hover:-translate-y-0.5'
+                    }`
+                  }
                 >
-                  <Icon size={18} />
-                  <span className="font-medium">{item.label}</span>
-                </Link>
+                  <Icon size={18} className="transition duration-200 group-hover:scale-110" />
+                  <span className="font-medium transition duration-200 group-hover:translate-x-1">{item.label}</span>
+                </NavLink>
               )
             })}
           </nav>
@@ -60,6 +76,12 @@ export default function Layout() {
                 <Bell size={20} />
                 <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-white text-[10px] flex items-center justify-center">3</span>
               </button>
+              <div className="hidden sm:flex flex-col items-end text-right">
+                <span className="font-medium text-on-surface">{profile?.full_name ?? user?.email ?? 'User'}</span>
+                <button onClick={handleLogout} className="text-sm text-primary hover:underline">
+                  Sign out
+                </button>
+              </div>
             </div>
           </header>
 

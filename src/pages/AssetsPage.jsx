@@ -1,15 +1,20 @@
-import { useMemo, useState } from 'react'
-import { Plus, Search, Tag } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, Search } from 'lucide-react'
+import { useAuth } from '../components/AuthProvider'
+import { supabase } from '../lib/supabaseClient'
 
 const categoryOptions = ['Electronics', 'Furniture', 'Vehicles', 'AV', 'Software']
 const statusOptions = ['Available', 'Allocated', 'Reserved', 'Under Maintenance', 'Lost', 'Retired']
 const locationOptions = ['HQ - 3rd Floor', 'Conference Room 2', 'Warehouse A', 'Remote Office']
 
+const fallbackAssets = [
+  { name: 'Laptop AF-0042', category: 'Electronics', tag: 'AF-0042', serial: 'LX-1290', status: 'Available', location: 'HQ - 3rd Floor' },
+  { name: 'Projector AF-0015', category: 'AV', tag: 'AF-0015', serial: 'PJ-4021', status: 'Reserved', location: 'Conference Room 2' },
+]
+
 export default function AssetsPage() {
-  const [assets, setAssets] = useState([
-    { name: 'Laptop AF-0042', category: 'Electronics', tag: 'AF-0042', serial: 'LX-1290', status: 'Available', location: 'HQ - 3rd Floor' },
-    { name: 'Projector AF-0015', category: 'AV', tag: 'AF-0015', serial: 'PJ-4021', status: 'Reserved', location: 'Conference Room 2' },
-  ])
+  const { user } = useAuth()
+  const [assets, setAssets] = useState(fallbackAssets)
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
@@ -17,6 +22,84 @@ export default function AssetsPage() {
   const [serial, setSerial] = useState('')
   const [location, setLocation] = useState(locationOptions[0])
   const [status, setStatus] = useState(statusOptions[0])
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!supabase) return
+
+    let mounted = true
+
+    async function loadAssets() {
+      const { data, error } = await supabase.from('assets').select('*').order('created_at', { ascending: false })
+      if (!mounted) return
+
+      if (!error && data?.length) {
+        setAssets(
+          data.map((asset) => ({
+            name: asset.name ?? asset.asset_name ?? asset.resource ?? 'Asset',
+            category: asset.category ?? asset.type ?? 'Other',
+            tag: asset.tag ?? asset.asset_tag ?? 'AF-0000',
+            serial: asset.serial ?? asset.serial_number ?? '-',
+            status: asset.status ?? asset.state ?? 'Available',
+            location: asset.location ?? asset.location_name ?? 'HQ - 3rd Floor',
+          })),
+        )
+      }
+
+      if (error && !['PGRST116', '42P01'].includes(error.code)) {
+        console.warn('Unable to load assets:', error.message)
+      }
+    }
+
+    loadAssets()
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  async function handleCreateAsset(event) {
+    event.preventDefault()
+    setError('')
+
+    const nextTag = `AF-${String(assets.length + 1).padStart(4, '0')}`
+    const newAsset = {
+      name,
+      category,
+      tag: nextTag,
+      serial,
+      status,
+      location,
+      created_by: user?.id ?? null,
+    }
+
+    if (supabase) {
+      const { data, error } = await supabase.from('assets').insert(newAsset).select('*').single()
+      if (error) {
+        console.error('Unable to save asset:', error.message)
+        setError('Unable to save asset right now. Please try again.')
+        return
+      }
+
+      setAssets((current) => [
+        {
+          name: data.name ?? newAsset.name,
+          category: data.category ?? newAsset.category,
+          tag: data.tag ?? newAsset.tag,
+          serial: data.serial ?? newAsset.serial,
+          status: data.status ?? newAsset.status,
+          location: data.location ?? newAsset.location,
+        },
+        ...current,
+      ])
+    } else {
+      setAssets((current) => [newAsset, ...current])
+    }
+
+    setName('')
+    setSerial('')
+    setShowForm(false)
+  }
 
   const filteredAssets = useMemo(() => {
     if (!search.trim()) return assets
@@ -27,18 +110,6 @@ export default function AssetsPage() {
         .includes(search.toLowerCase()),
     )
   }, [search, assets])
-
-  function handleCreateAsset(event) {
-    event.preventDefault()
-    const nextTag = `AF-${String(assets.length + 1).padStart(4, '0')}`
-    setAssets((current) => [
-      ...current,
-      { name, category, tag: nextTag, serial, status, location },
-    ])
-    setName('')
-    setSerial('')
-    setShowForm(false)
-  }
 
   return (
     <div className="space-y-6">
@@ -133,6 +204,7 @@ export default function AssetsPage() {
                 </button>
               </div>
             </div>
+            {error && <div className="text-sm text-status-error">{error}</div>}
           </form>
         )}
 

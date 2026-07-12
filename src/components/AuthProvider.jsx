@@ -1,11 +1,12 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
-const AuthContext = createContext({ user: null, session: null, loading: true })
+const AuthContext = createContext({ user: null, profile: null, session: null, loading: true })
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [user, setUser] = useState(null)
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -15,10 +16,46 @@ export function AuthProvider({ children }) {
     }
 
     let mounted = true
-    const timeout = setTimeout(() => {
+    const timeout = window.setTimeout(() => {
       if (!mounted) return
       setLoading(false)
     }, 5000)
+
+    async function ensureProfile(user) {
+      if (!user?.id) return null
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+      if (error && error.code !== 'PGRST116') {
+        console.warn('Unable to fetch profile:', error.message)
+      }
+
+      if (data) {
+        return data
+      }
+
+      const { data: createdProfile, error: creationError } = await supabase
+        .from('profiles')
+        .insert({
+          id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.full_name ?? null,
+          role: 'Employee',
+        })
+        .select('*')
+        .single()
+
+      if (creationError) {
+        console.warn('Unable to create profile:', creationError.message)
+        return null
+      }
+
+      return createdProfile
+    }
 
     async function loadSession() {
       try {
@@ -26,13 +63,21 @@ export function AuthProvider({ children }) {
           data: { session },
         } = await supabase.auth.getSession()
         if (!mounted) return
+
         setSession(session)
-        setUser(session?.user ?? null)
+        const currentUser = session?.user ?? null
+        setUser(currentUser)
+
+        if (currentUser) {
+          const currentProfile = await ensureProfile(currentUser)
+          if (!mounted) return
+          setProfile(currentProfile)
+        }
       } catch (error) {
         console.error('Failed to load session', error)
       } finally {
         if (!mounted) return
-        clearTimeout(timeout)
+        window.clearTimeout(timeout)
         setLoading(false)
       }
     }
@@ -41,20 +86,30 @@ export function AuthProvider({ children }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user ?? null
+      if (!mounted) return
       setSession(session)
-      setUser(session?.user ?? null)
+      setUser(currentUser)
+
+      if (currentUser) {
+        const currentProfile = await ensureProfile(currentUser)
+        if (!mounted) return
+        setProfile(currentProfile)
+      } else {
+        setProfile(null)
+      }
     })
 
     return () => {
       mounted = false
-      clearTimeout(timeout)
+      window.clearTimeout(timeout)
       subscription?.unsubscribe()
     }
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, session, loading }}>
+    <AuthContext.Provider value={{ user, session, profile, loading }}>
       {children}
     </AuthContext.Provider>
   )
