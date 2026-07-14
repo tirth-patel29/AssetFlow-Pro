@@ -14,6 +14,7 @@ AssetFlow is a React + Vite frontend for an enterprise asset management dashboar
 - Responsive sidebar navigation with glass UI styling
 - Vercel-compatible client-side routing support
 
+
 ## Tech stack
 
 - React 19
@@ -103,3 +104,5 @@ To deploy to Vercel:
 - If routes 404 on refresh, verify `vercel.json` exists and is deployed
 - If assets do not appear, confirm the `assets` table contains rows and the Supabase env vars are correct
 - If signup fails due to email rate limits, retry after a few minutes and confirm the Supabase project is configured correctly
+
+- 
